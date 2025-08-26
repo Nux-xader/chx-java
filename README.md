@@ -1,9 +1,5 @@
 # chx-java
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://example.com/build)
-[![Coverage Status](https://img.shields.io/badge/coverage-80%25-green)](https://example.com/coverage)
-[![Quality Gate Status](https://img.shields.io/badge/quality%20gate-passed-brightgreen)](https://example.com/quality)
-
 chx-java is a Java library for interacting with a CHX server. It allows you to set, get, and delete data based on keys.
 
 ## Prerequisites
@@ -113,4 +109,4 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [GNU License](LICENSE).
