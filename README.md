@@ -9,7 +9,8 @@ chx-java is a Java library for interacting with a CHX server. It allows you to s
 
 ## Building the Project
 
-To build this project into a production-ready JAR file, use the following command:
+You can getting jar file from release page on this github repository or
+Build this project into a production-ready JAR file, use the following command:
 
 ```bash
 mvn clean install
@@ -22,11 +23,15 @@ This command will compile the source code, run the test cases, and create a JAR 
 To use the `chx-java` library in another Java project, add the following dependency to your project's `pom.xml` file:
 
 ```xml
-<dependency>
-    <groupId>io.nuxxader</groupId>
-    <artifactId>chx</artifactId>
-    <version>1.0.0</version>
-</dependency>
+    <dependencies>
+        <dependency>
+            <groupId>io.nuxxader</groupId>
+            <artifactId>chx</artifactId>
+            <version>x.x.x</version>
+            <scope>system</scope>
+            <systemPath>\somepath-to\chx-java-x.x.x.jar</systemPath>
+        </dependency>
+    </dependencies>
 ```
 
 Then, you can use the `CHXClient` class to interact with the CHX server:
