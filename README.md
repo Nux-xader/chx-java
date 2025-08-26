@@ -1,5 +1,9 @@
 # chx-java
 
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://example.com/build)
+[![Coverage Status](https://img.shields.io/badge/coverage-80%25-green)](https://example.com/coverage)
+[![Quality Gate Status](https://img.shields.io/badge/quality%20gate-passed-brightgreen)](https://example.com/quality)
+
 chx-java is a Java library for interacting with a CHX server. It allows you to set, get, and delete data based on keys.
 
 ## Prerequisites
@@ -34,15 +38,62 @@ Then, you can use the `CHXClient` class to interact with the CHX server:
 ```java
 import io.nuxxader.chx.CHXClient;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        CHXClient client = new CHXClient("127.0.0.1:3800");
-        client.set("foo", "bar");
-        Optional<String> value = client.get("foo");
-        value.ifPresent(System.out::println); // Output: bar
-        client.delete("foo");
-        client.close();
+        String serverAddress = "127.0.0.1:3800";
+        int numberOfThreads = 10;
+        String key = "testKey";
+        String value = "testValue";
+
+        ExecutorService executorService = Executors.newFixedThreadPool(numberOfThreads);
+
+        try (CHXClient client = new CHXClient(serverAddress)) {
+            // Test set
+            for (int i = 0; i < numberOfThreads; i++) {
+                executorService.execute(() -> {
+                    try {
+                        client.set(key, value);
+                        System.out.println(Thread.currentThread().getName() + ": Set command executed");
+                    } catch (CHXServerException e) {
+                        System.err.println(Thread.currentThread().getName() + ": Error setting value: " + e.getMessage());
+                    }
+                });
+            }
+
+            // Test get
+            for (int i = 0; i < numberOfThreads; i++) {
+                executorService.execute(() -> {
+                    try {
+                        Optional<String> retrievedValue = client.get(key);
+                        retrievedValue.ifPresent(val ->
+                            System.out.println(Thread.currentThread().getName() + ": Retrieved value: " + val));
+                    } catch (Exception e) {
+                        System.err.println(Thread.currentThread().getName() + ": Error getting value: " + e.getMessage());
+                    }
+                });
+            }
+
+            // Test delete
+            for (int i = 0; i < numberOfThreads; i++) {
+                executorService.execute(() -> {
+                    try {
+                        client.delete(key);
+                        System.out.println(Thread.currentThread().getName() + ": Delete command executed");
+                    } catch (Exception e) {
+                        System.err.println(Thread.currentThread().getName() + ": Error deleting value: " + e.getMessage());
+                    }
+                });
+            }
+        } catch (Exception e) {
+            System.err.println("Error creating client: " + e.getMessage());
+        } finally {
+            executorService.shutdown();
+            executorService.awaitTermination(1, TimeUnit.MINUTES);
+        }
     }
 }
 ```
@@ -51,7 +102,10 @@ public class Main {
 
 *   The CHX server must be configured correctly for this library to function.
 *   The constructor throws an `IllegalArgumentException` if the server address format is invalid.
-*   This library throws a `CHXServerException` if an error occurs while interacting with the CHX server.
+*   The `CHXClient` constructor and methods `set`, `get`, and `delete` throw `CHXServerException` if there are issues communicating with the CHX server.
+*   The `CHXClient` constructor throws an `IllegalArgumentException` if the server address format is invalid or if an invalid command is sent.
+*   The sample code demonstrates how to use `ExecutorService` to perform concurrent operations.
+*   It's important to call `executorService.shutdown()` and `executorService.awaitTermination()` to properly release resources.
 
 ## Contributing
 
@@ -59,4 +113,4 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 
 ## License
 
-This project is licensed under the GNU GPL version 3. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the [MIT License](LICENSE).

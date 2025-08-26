@@ -61,38 +61,27 @@ class AppTest {
     void testGet_notFound() {
         try {
             client = new CHXClient(SERVER_ADDRESS);
-            assertThrows(CHXServerException.class, () -> {
-                client.get("nonexistent");
-            }, "Expected CHXServerException for non-existent key");
+            assertEquals(java.util.Optional.empty(), client.get("nonexistent"), "Expected Optional.empty() for non-existent key");
         } catch (Exception e) {
-            e.printStackTrace();
             fail("Exception during client creation: " + e.getMessage());
         }
     }
 
     @Test
     void testGet_emptyKey() {
-        try {
+        assertThrows(CHXServerException.class, () -> {
             client = new CHXClient(SERVER_ADDRESS);
-            assertThrows(CHXServerException.class, () -> {
-                client.get("");
-            }, "Expected CHXServerException for empty key");
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail("Exception during client creation: " + e.getMessage());
-        }
+            client.get("");
+        }, "Expected CHXServerException for empty key");
     }
 
     @Test
     void testDelete_notFound() {
         try {
             client = new CHXClient(SERVER_ADDRESS);
-            assertThrows(CHXServerException.class, () -> {
-                client.delete("nonexistent");
-            }, "Expected CHXServerException when deleting a non-existent key");
+            client.delete("nonexistent");
         } catch (Exception e) {
-            e.printStackTrace();
-            fail("Exception during client creation: " + e.getMessage());
+            fail("IOException during client creation: " + e.getMessage());
         }
     }
 
@@ -100,11 +89,18 @@ class AppTest {
     void testDelete_emptyKey() {
         try {
             client = new CHXClient(SERVER_ADDRESS);
-            assertThrows(CHXServerException.class, () -> {
-                client.delete("");
-            }, "Expected CHXServerException for empty key");
+            assertThrows(CHXServerException.class, () -> client.delete(""), "Expected CHXServerException for empty key");
         } catch (Exception e) {
-            e.printStackTrace();
+            fail("IOException during client creation: " + e.getMessage());
+        }
+    }
+
+    @Test
+    void testInvalidCommandFormat() {
+        try {
+            client = new CHXClient(SERVER_ADDRESS);
+            assertThrows(IllegalArgumentException.class, () -> client.sendCommand("invalid command"), "Expected IllegalArgumentException for invalid command format");
+        } catch (Exception e) {
             fail("Exception during client creation: " + e.getMessage());
         }
     }
@@ -117,6 +113,25 @@ class AppTest {
             assertThrows(Exception.class, () -> {
                 client.get("anykey");
             }, "Expected exception when getting from a closed connection");
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail("Exception during client creation or closing: " + e.getMessage());
+        }
+    }
+
+    @Test
+    void testSetGetDelete() {
+        try {
+            client = new CHXClient(SERVER_ADDRESS);
+            String key = "testKey";
+            String value = "testValue";
+
+            client.set(key, value);
+            assertEquals(java.util.Optional.of(value), client.get(key), "Expected value to be retrieved");
+
+            client.delete(key);
+            assertEquals(java.util.Optional.empty(), client.get(key), "Expected value to be deleted");
+
         } catch (Exception e) {
             e.printStackTrace();
             fail("Exception during client creation or closing: " + e.getMessage());

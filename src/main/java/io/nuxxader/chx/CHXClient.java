@@ -11,7 +11,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * This class provides a client for interacting with the CHX server.
  */
-public class CHXClient {
+public class CHXClient implements AutoCloseable {
 
     private static final String DEFAULT_ADDR = "127.0.0.1:3800";
     private Socket conn;
@@ -56,7 +56,7 @@ public class CHXClient {
      */
     public Optional<String> get(String key) throws IOException {
         if (key == null || key.isEmpty()) {
-            throw new CHXServerException("Not Found"); // Equivalent to ErrNotFound in Go for empty key
+            throw new CHXServerException("Missing Key");
         }
 
         lock.lock();
@@ -75,6 +75,10 @@ public class CHXClient {
      * @throws IOException If an I/O error occurs during communication with the server.
      */
     public void set(String key, String value) throws IOException {
+        if (key == null || key.isEmpty() || value == null || value.isEmpty()) {
+            throw new CHXServerException("Missing Key or Value");
+        }
+
         lock.lock();
         try {
             sendCommand("S "+ key + " " + value);
@@ -92,7 +96,7 @@ public class CHXClient {
      */
     public void delete(String key) throws IOException {
         if (key == null || key.isEmpty()) {
-            throw new CHXServerException("Not Found"); // Equivalent to ErrNotFound in Go for empty key
+            throw new CHXServerException("Missing Key");
         }
 
         lock.lock();
@@ -134,17 +138,30 @@ public class CHXClient {
      * @throws IOException If an I/O error occurs while reading the response.
      * @throws CHXServerException If the server returns an error.
      */
-    private Optional<String> sendCommand(String command) throws IOException {
+    public Optional<String> sendCommand(String command) throws IOException {
+        if (!command.matches("^[GSD] .+")) {
+            throw new IllegalArgumentException("Invalid command format: " + command);
+        }
+        if (writer == null) {
+            throw new IOException("Writer is null. The client may be closed.");
+        }
         writer.printf(command + "\n");
         char[] buffer = new char[524288];
-        int bytesRead = reader.read(buffer, 0, 524288);
+        int bytesRead = 0;
+
+        try {
+            bytesRead = reader.read(buffer, 0, 524288);
+        } catch (IOException e) {
+            throw new IOException("Error reading response from server: " + e.getMessage(), e);
+        }
+        
         if (bytesRead == -1) {
             throw new IOException("Server closed connection or sent empty response.");
         }
         String response = new String(buffer, 0, bytesRead).trim();
 
         if (response.equals("!")) {
-            throw new CHXServerException("Not Found");
+            return Optional.empty();
         } else if (response.startsWith(">")) {
             return Optional.of(response.substring(1));
         } else if (response.startsWith("!e")) {
