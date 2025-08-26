@@ -1,0 +1,155 @@
+package io.nuxxader.chx;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+import java.util.Optional;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * This class provides a client for interacting with the CHX server.
+ */
+public class CHXClient {
+
+    private static final String DEFAULT_ADDR = "127.0.0.1:3800";
+    private Socket conn;
+    private PrintWriter writer;
+    private BufferedReader reader;
+    private final ReentrantLock lock;
+
+    /**
+     * Creates a new instance of {@link CHXClient} and connects it to the CHX server at the given address.
+     *
+     * @param address The address of the CHX server in "host:port" format. If null or empty, the default address "127.0.0.1:3800" will be used.
+     * @throws IOException If an I/O error occurs during the connection to the server.
+     * @throws IllegalArgumentException If the address format is invalid.
+     */
+    public CHXClient(String address) throws IOException {
+        if (address == null || address.isEmpty()) {
+            address = DEFAULT_ADDR;
+        }
+        String[] parts = address.split(":");
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("Invalid address format. Expected host:port");
+        }
+        String host = parts[0];
+        int port = Integer.parseInt(parts[1]);
+        try {
+            this.conn = new Socket(host, port);
+            this.writer = new PrintWriter(conn.getOutputStream(), true);
+            this.reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            this.lock = new ReentrantLock();
+        } catch (IOException e) {
+            throw new java.net.ConnectException("Failed to connect to CHX server: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Retrieves the value associated with the given key from the CHX server.
+     *
+     * @param key The key to retrieve the value for.
+     * @return The value associated with the key, or {@link Optional#empty()} if the key is not found.
+     * @throws IOException If an I/O error occurs during communication with the server.
+     * @throws CHXServerException If the server returns a "Not Found" error for an empty key.
+     */
+    public Optional<String> get(String key) throws IOException {
+        if (key == null || key.isEmpty()) {
+            throw new CHXServerException("Not Found"); // Equivalent to ErrNotFound in Go for empty key
+        }
+
+        lock.lock();
+        try {
+            return sendCommand("G "+ key);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Sets the value associated with the given key on the CHX server.
+     *
+     * @param key The key to set the value for.
+     * @param value The value to set.
+     * @throws IOException If an I/O error occurs during communication with the server.
+     */
+    public void set(String key, String value) throws IOException {
+        lock.lock();
+        try {
+            sendCommand("S "+ key + " " + value);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Deletes the key and its associated value from the CHX server.
+     *
+     * @param key The key to delete.
+     * @throws IOException If an I/O error occurs during communication with the server.
+     * @throws CHXServerException If the server returns a "Not Found" error for an empty key.
+     */
+    public void delete(String key) throws IOException {
+        if (key == null || key.isEmpty()) {
+            throw new CHXServerException("Not Found"); // Equivalent to ErrNotFound in Go for empty key
+        }
+
+        lock.lock();
+        try {
+            sendCommand("D "+ key);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Closes the connection to the CHX server and releases related resources.
+     *
+     * @throws IOException If an I/O error occurs during connection closure.
+     */
+    public void close() throws IOException {
+        try {
+            if (writer != null) {
+                writer.close();
+            }
+            if (reader != null) {
+                reader.close();
+            }
+            if (conn != null && !conn.isClosed()) {
+                conn.close();
+            }
+        } finally {
+            // Ensure resources are nulled out even if close fails
+            writer = null;
+            reader = null;
+            conn = null;
+        }
+    }
+
+    /**
+     * Reads the response from the CHX server.
+     *
+     * @return The response from the CHX server.
+     * @throws IOException If an I/O error occurs while reading the response.
+     * @throws CHXServerException If the server returns an error.
+     */
+    private Optional<String> sendCommand(String command) throws IOException {
+        writer.printf(command + "\n");
+        char[] buffer = new char[524288];
+        int bytesRead = reader.read(buffer, 0, 524288);
+        if (bytesRead == -1) {
+            throw new IOException("Server closed connection or sent empty response.");
+        }
+        String response = new String(buffer, 0, bytesRead).trim();
+
+        if (response.equals("!")) {
+            throw new CHXServerException("Not Found");
+        } else if (response.startsWith(">")) {
+            return Optional.of(response.substring(1));
+        } else if (response.startsWith("!e")) {
+            throw new CHXServerException(response.substring(2));
+        }
+        throw new IOException("Invalid response: " + response);
+    }
+}

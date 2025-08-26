@@ -1,0 +1,19 @@
+# File dan direktori yang dihasilkan oleh IDE
+.idea/
+.settings/
+
+# File dan direktori yang dihasilkan oleh Maven
+target/
+
+# File .classpath dan .project
+.classpath
+.project
+
+# File log
+*.log
+
+# File class
+*.class
+
+# File jar
+*.jar
