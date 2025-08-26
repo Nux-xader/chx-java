@@ -113,21 +113,14 @@ public class CHXClient implements AutoCloseable {
      * @throws IOException If an I/O error occurs during connection closure.
      */
     public void close() throws IOException {
-        try {
-            if (writer != null) {
-                writer.close();
-            }
-            if (reader != null) {
-                reader.close();
-            }
-            if (conn != null && !conn.isClosed()) {
-                conn.close();
-            }
-        } finally {
-            // Ensure resources are nulled out even if close fails
-            writer = null;
-            reader = null;
-            conn = null;
+        if (writer != null) {
+            writer.close();
+        }
+        if (reader != null) {
+            reader.close();
+        }
+        if (conn != null && !conn.isClosed()) {
+            conn.close();
         }
     }
 
