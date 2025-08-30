@@ -34,79 +34,42 @@ To use the `chx-java` library in another Java project, add the following depende
     </dependencies>
 ```
 
-Then, you can use the `CHXClient` class to interact with the CHX server:
+Then, you can use the `CHXClient` class to interact with the CHX server. The following example shows how to use `CHXClient` to perform `set`, `get`, and `delete` operations:
 
 ```java
 import io.nuxxader.chx.CHXClient;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class Main {
     public static void main(String[] args) throws Exception {
         String serverAddress = "127.0.0.1:3800";
-        int numberOfThreads = 10;
         String key = "testKey";
         String value = "testValue";
 
-        ExecutorService executorService = Executors.newFixedThreadPool(numberOfThreads);
-
+        // Use try-with-resources to ensure the client is closed properly
         try (CHXClient client = new CHXClient(serverAddress)) {
-            // Test set
-            for (int i = 0; i < numberOfThreads; i++) {
-                executorService.execute(() -> {
-                    try {
-                        client.set(key, value);
-                        System.out.println(Thread.currentThread().getName() + ": Set command executed");
-                    } catch (CHXServerException e) {
-                        System.err.println(Thread.currentThread().getName() + ": Error setting value: " + e.getMessage());
-                    }
-                });
-            }
+            // Set value
+            client.set(key, value);
+            System.out.println("Value set successfully");
 
-            // Test get
-            for (int i = 0; i < numberOfThreads; i++) {
-                executorService.execute(() -> {
-                    try {
-                        Optional<String> retrievedValue = client.get(key);
-                        retrievedValue.ifPresent(val ->
-                            System.out.println(Thread.currentThread().getName() + ": Retrieved value: " + val));
-                    } catch (Exception e) {
-                        System.err.println(Thread.currentThread().getName() + ": Error getting value: " + e.getMessage());
-                    }
-                });
-            }
+            // Get value
+            Optional<String> retrievedValue = client.get(key);
+            retrievedValue.ifPresent(val -> System.out.println("Retrieved value: " + val));
 
-            // Test delete
-            for (int i = 0; i < numberOfThreads; i++) {
-                executorService.execute(() -> {
-                    try {
-                        client.delete(key);
-                        System.out.println(Thread.currentThread().getName() + ": Delete command executed");
-                    } catch (Exception e) {
-                        System.err.println(Thread.currentThread().getName() + ": Error deleting value: " + e.getMessage());
-                    }
-                });
-            }
+            // Delete value
+            client.delete(key);
+            System.out.println("Value deleted successfully");
         } catch (Exception e) {
-            System.err.println("Error creating client: " + e.getMessage());
-        } finally {
-            executorService.shutdown();
-            executorService.awaitTermination(1, TimeUnit.MINUTES);
+            System.err.println("An error occurred: " + e.getMessage());
         }
     }
 }
 ```
 
-## Additional Information
+**Key Features:**
 
-*   The CHX server must be configured correctly for this library to function.
-*   The constructor throws an `IllegalArgumentException` if the server address format is invalid.
-*   The `CHXClient` constructor and methods `set`, `get`, and `delete` throw `CHXServerException` if there are issues communicating with the CHX server.
-*   The `CHXClient` constructor throws an `IllegalArgumentException` if the server address format is invalid or if an invalid command is sent.
-*   The sample code demonstrates how to use `ExecutorService` to perform concurrent operations.
-*   It's important to call `executorService.shutdown()` and `executorService.awaitTermination()` to properly release resources.
+*   **Thread Safety:** `CHXClient` is safe to use in multi-threaded environments.
+*   **Error Handling:** The methods in `CHXClient` throw exceptions if there is a connection or I/O error.
 
 ## Contributing
 
@@ -114,4 +77,4 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 
 ## License
 
-This project is licensed under the [GNU License](LICENSE).
+This project is licensed under the [GPL License](LICENSE).
