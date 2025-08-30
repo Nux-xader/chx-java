@@ -8,8 +8,12 @@ import java.net.Socket;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 
+
+
 /**
- * This class provides a client for interacting with the CHX server.
+ * Client for interacting with the CHX server.
+ * This class provides methods to set, get, and delete data based on keys.
+ * CHXClient is thread-safe.
  */
 public class CHXClient implements AutoCloseable {
 
@@ -20,7 +24,7 @@ public class CHXClient implements AutoCloseable {
     private final ReentrantLock lock;
 
     /**
-     * Creates a new instance of {@link CHXClient} and connects it to the CHX server at the given address.
+     * Creates a new instance of {@link CHXClient} and connects to the CHX server at the given address.
      *
      * @param address The address of the CHX server in "host:port" format. If null or empty, the default address "127.0.0.1:3800" will be used.
      * @throws IOException If an I/O error occurs during the connection to the server.
@@ -42,7 +46,7 @@ public class CHXClient implements AutoCloseable {
             this.reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
             this.lock = new ReentrantLock();
         } catch (IOException e) {
-            throw new java.net.ConnectException("Failed to connect to CHX server: " + e.getMessage());
+            throw new IOException("Failed to connect to CHX server", e);
         }
     }
 
@@ -52,39 +56,22 @@ public class CHXClient implements AutoCloseable {
      * @param key The key to retrieve the value for.
      * @return The value associated with the key, or {@link Optional#empty()} if the key is not found.
      * @throws IOException If an I/O error occurs during communication with the server.
-     * @throws CHXServerException If the server returns a "Not Found" error for an empty key.
      */
     public Optional<String> get(String key) throws IOException {
-        if (key == null || key.isEmpty()) {
-            throw new CHXServerException("Missing Key");
-        }
-
-        lock.lock();
-        try {
-            return sendCommand("G "+ key);
-        } finally {
-            lock.unlock();
-        }
+        if (key == null || key.isEmpty()) return Optional.empty();
+        return sendCommand("G "+ key);
     }
 
     /**
      * Sets the value associated with the given key on the CHX server.
      *
-     * @param key The key to set the value for.
+     * @param key   The key to set the value for.
      * @param value The value to set.
      * @throws IOException If an I/O error occurs during communication with the server.
      */
     public void set(String key, String value) throws IOException {
-        if (key == null || key.isEmpty() || value == null || value.isEmpty()) {
-            throw new CHXServerException("Missing Key or Value");
-        }
-
-        lock.lock();
-        try {
-            sendCommand("S "+ key + " " + value);
-        } finally {
-            lock.unlock();
-        }
+        if (key == null || key.isEmpty() || value == null || value.isEmpty()) return;
+        sendCommand("S "+ key + " " + value);
     }
 
     /**
@@ -92,25 +79,16 @@ public class CHXClient implements AutoCloseable {
      *
      * @param key The key to delete.
      * @throws IOException If an I/O error occurs during communication with the server.
-     * @throws CHXServerException If the server returns a "Not Found" error for an empty key.
      */
     public void delete(String key) throws IOException {
-        if (key == null || key.isEmpty()) {
-            throw new CHXServerException("Missing Key");
-        }
-
-        lock.lock();
-        try {
-            sendCommand("D "+ key);
-        } finally {
-            lock.unlock();
-        }
+        if (key == null || key.isEmpty()) return;
+        sendCommand("D "+ key);
     }
 
     /**
-     * Closes the connection to the CHX server and releases related resources.
+     * Closes the connection to the CHX server and releases associated resources.
      *
-     * @throws IOException If an I/O error occurs during connection closure.
+     * @throws IOException If an I/O error occurs during the closing of the connection.
      */
     public void close() throws IOException {
         if (writer != null) {
@@ -123,43 +101,45 @@ public class CHXClient implements AutoCloseable {
             conn.close();
         }
     }
-
     /**
      * Reads the response from the CHX server.
      *
      * @return The response from the CHX server.
      * @throws IOException If an I/O error occurs while reading the response.
-     * @throws CHXServerException If the server returns an error.
      */
-    public Optional<String> sendCommand(String command) throws IOException {
-        if (!command.matches("^[GSD] .+")) {
-            throw new IllegalArgumentException("Invalid command format: " + command);
-        }
+    private Optional<String> sendCommand(String command) throws IOException {
         if (writer == null) {
             throw new IOException("Writer is null. The client may be closed.");
         }
+
+        lock.lock();
         writer.printf(command + "\n");
         char[] buffer = new char[524288];
         int bytesRead = 0;
 
         try {
-            bytesRead = reader.read(buffer, 0, 524288);
-        } catch (IOException e) {
-            throw new IOException("Error reading response from server: " + e.getMessage(), e);
-        }
-        
-        if (bytesRead == -1) {
-            throw new IOException("Server closed connection or sent empty response.");
-        }
-        String response = new String(buffer, 0, bytesRead).trim();
+            try {
+                bytesRead = reader.read(buffer, 0, 524288);
+            } catch (IOException e) {
+                throw new IOException("Error reading response from server: " + e.getMessage(), e);
+            }
+            
+            if (bytesRead == -1) {
+                throw new IOException("Server closed connection or sent empty response.");
+            }
+            String response = new String(buffer, 0, bytesRead).trim();
 
-        if (response.equals("!")) {
-            return Optional.empty();
-        } else if (response.startsWith(">")) {
-            return Optional.of(response.substring(1));
-        } else if (response.startsWith("!e")) {
-            throw new CHXServerException(response.substring(2));
+            Optional<String> result = Optional.empty();
+
+            if (response.startsWith(">")) {
+                result = Optional.of(response.substring(1));
+            }
+
+            lock.unlock();
+            return result;
+        } catch (IOException e)  {
+            lock.unlock();
+            throw e;
         }
-        throw new IOException("Invalid response: " + response);
     }
 }
